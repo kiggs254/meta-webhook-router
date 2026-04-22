@@ -1,7 +1,7 @@
 import express, { type Express } from 'express';
 import { config } from './config/index.js';
 import { sequelize } from './models/index.js';
-import { handleMetaVerification, handleMetaEvent } from './routes/meta.js';
+import { handleMetaVerification, handleMetaEvent, handleWebhookHitsList } from './routes/meta.js';
 import registrationsRouter from './routes/registrations.js';
 import logger from './utils/logger.js';
 
@@ -22,6 +22,15 @@ export async function createApp(): Promise<Express> {
     }
   });
 
+  // Trace every incoming request at info level so operators can see in Coolify
+  // logs whether Meta is hitting the router at all.
+  app.use((req, _res, next) => {
+    if (req.path.startsWith('/meta/')) {
+      logger.info(`[http] ${req.method} ${req.originalUrl}`);
+    }
+    next();
+  });
+
   // Meta webhooks
   //   GET: query params only; no body parsing needed.
   //   POST: raw body required for HMAC verification. Mount express.raw BEFORE
@@ -32,6 +41,7 @@ export async function createApp(): Promise<Express> {
   // Everything else parses JSON.
   app.use(express.json({ limit: '1mb' }));
 
+  app.get('/api/v1/webhook-hits', handleWebhookHitsList);
   app.use('/api/v1/registrations', registrationsRouter);
 
   // 404
