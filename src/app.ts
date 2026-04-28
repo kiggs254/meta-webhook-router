@@ -3,6 +3,7 @@ import { config } from './config/index.js';
 import { sequelize } from './models/index.js';
 import { handleMetaVerification, handleMetaEvent, handleWebhookHitsList } from './routes/meta.js';
 import registrationsRouter from './routes/registrations.js';
+import embeddedSignupRouter from './routes/embeddedSignup.js';
 import logger from './utils/logger.js';
 
 export async function createApp(): Promise<Express> {
@@ -43,6 +44,11 @@ export async function createApp(): Promise<Express> {
 
   app.get('/api/v1/webhook-hits', handleWebhookHitsList);
   app.use('/api/v1/registrations', registrationsRouter);
+
+  // Embedded-signup proxy: serves an HTML page that runs FB.login on this
+  // domain (the single domain whitelisted in Meta's JS SDK host list) and
+  // relays results back to the originating Shopflow install via postMessage.
+  app.use('/embedded-signup', embeddedSignupRouter);
 
   // 404
   app.use((_req, res) => {

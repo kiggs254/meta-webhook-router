@@ -90,6 +90,43 @@ In the Meta App Dashboard → WhatsApp → Configuration → Webhooks:
 - **Verify token**: value of `META_WEBHOOK_VERIFY_TOKEN`
 - **Fields**: subscribe `messages` and `message_template_status_update`
 
+## Embedded-signup proxy
+
+Meta requires every domain that loads the Facebook JS SDK for embedded signup to be on the App's "Allowed Domains for the JavaScript SDK" list. Adding every Shopflow installation domain doesn't scale, so the router can serve the signup page itself on its single whitelisted domain and relay results back to each installation.
+
+### Setup
+
+1. Whitelist **only the router's host** in Meta App Dashboard → Settings → Advanced → JavaScript SDK Allowed Domains.
+2. Set on the router:
+   ```
+   META_APP_ID=<TSP App ID>
+   META_EMBEDDED_SIGNUP_CONFIG_ID=<Business config ID>
+   META_SOLUTION_ID=<optional, Solution Partners only>
+   ```
+3. On each Shopflow install, set `META_EMBEDDED_SIGNUP_PROXY_URL=https://<router-host>` and restart the admin backend. To run an install standalone (loading the SDK on its own domain), leave the var unset.
+
+### Flow
+
+```
+Shopflow admin                 Router                       Meta
+─────────────                  ──────                       ────
+window.open(/embedded-signup/start
+  ?tenant_id=…&state=…&parent_origin=…) ─►
+                              serves HTML, loads sdk.js,
+                              runs FB.login           ─►
+                                                       ◄─ postMessage WA_EMBEDDED_SIGNUP
+                                                          (waba_id, phone_number_id, …)
+                              FB.login returns { code }
+                              window.opener.postMessage(
+                                {code, event, waba_id, …},
+                                parent_origin)              ─►
+admin verifies state matches, posts the same payload to its existing
+POST /api/v1/whatsapp/onboarding/complete (which exchanges the code
+with Graph API using the install's own META_APP_SECRET).
+```
+
+The router never sees the auth code or any access token — those live only in the browser and the originating Shopflow backend.
+
 ## API
 
 ### Webhook (public, Meta-signed)

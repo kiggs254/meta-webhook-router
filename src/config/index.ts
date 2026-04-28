@@ -24,6 +24,15 @@ export const config = {
   meta: {
     appSecret: process.env.META_APP_SECRET || '',
     verifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN || '',
+    // Embedded-signup proxy fields. The router serves a small HTML page that
+    // loads the FB JS SDK on the router's whitelisted domain and relays the
+    // resulting auth code + WABA metadata back to the originating Shopflow
+    // install via window.opener.postMessage. These four come from the same
+    // Meta Tech Provider App that produced META_APP_SECRET.
+    appId: process.env.META_APP_ID || '',
+    embeddedSignupConfigId: process.env.META_EMBEDDED_SIGNUP_CONFIG_ID || '',
+    solutionId: process.env.META_SOLUTION_ID || '',
+    graphVersion: process.env.META_GRAPH_VERSION || 'v21.0',
   },
   fanout: {
     timeoutMs: readInt('FORWARD_TIMEOUT_MS', 4000),
