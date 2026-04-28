@@ -103,7 +103,7 @@ Meta requires every domain that loads the Facebook JS SDK for embedded signup to
    META_EMBEDDED_SIGNUP_CONFIG_ID=<Business config ID>
    META_SOLUTION_ID=<optional, Solution Partners only>
    ```
-3. On each Shopflow install, set `META_EMBEDDED_SIGNUP_PROXY_URL=https://<router-host>` and restart the admin backend. To run an install standalone (loading the SDK on its own domain), leave the var unset.
+3. Each Shopflow install reuses the existing `WEBHOOK_ROUTER_URL` + `WEBHOOK_ROUTER_TENANT_ID` vars (already required for webhook fanout) — no separate env. When both are set, the admin frontend opens its signup popup at the router. To run an install standalone (loading the SDK on its own domain), leave `WEBHOOK_ROUTER_URL` unset.
 
 ### Flow
 
