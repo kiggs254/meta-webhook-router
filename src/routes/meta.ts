@@ -233,5 +233,21 @@ export async function handleWebhookHitsList(req: Request, res: Response): Promis
     order: [['id', 'DESC']],
     limit,
   });
-  res.json({ status: 'success', data: { hits: rows } });
+  // This endpoint is intentionally unauthenticated for ops convenience, so it
+  // must not leak tenant-identifying data. Strip `waba_ids` (tenant WABA ids)
+  // and `reason` (can echo config/secret hints); expose only counts, outcomes,
+  // timestamps, and body sizes.
+  const hits = rows.map((row) => ({
+    id: row.id,
+    received_at: row.received_at,
+    method: row.method,
+    outcome: row.outcome,
+    http_status: row.http_status,
+    entry_count: row.entry_count,
+    dispatched_count: row.dispatched_count,
+    signature_present: row.signature_present,
+    verify_mode: row.verify_mode,
+    body_size: row.body_size,
+  }));
+  res.json({ status: 'success', data: { hits } });
 }

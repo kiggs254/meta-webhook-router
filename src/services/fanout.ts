@@ -3,6 +3,7 @@ import { Op } from 'sequelize';
 import { config } from '../config/index.js';
 import { DeliveryLog, Registration, sequelize } from '../models/index.js';
 import { hmacSha256Hex } from '../utils/hmac.js';
+import { assertSafeForwardUrl, SsrfError } from '../utils/ssrfGuard.js';
 import logger from '../utils/logger.js';
 
 let dispatching = false;
@@ -78,12 +79,35 @@ async function dispatchOne(row: DeliveryLog): Promise<void> {
       return;
     }
 
+    // Re-validate the destination immediately before dispatch. The URL was
+    // checked at registration, but DNS can be rebound to a private address
+    // afterwards (TOCTOU); this closes that window.
+    try {
+      await assertSafeForwardUrl(reg.forward_url);
+    } catch (err) {
+      if (err instanceof SsrfError) {
+        logger.warn(
+          `[dispatcher] refusing delivery ${row.id} — forward_url failed SSRF guard: ${err.message}`
+        );
+        await row.update({
+          status: 'failed',
+          last_error: `forward_url blocked by SSRF guard: ${err.message}`,
+          next_retry_at: null,
+        });
+        return;
+      }
+      throw err;
+    }
+
     const body = JSON.stringify(row.payload);
     const signature = hmacSha256Hex(reg.forward_secret, body);
 
     try {
       const resp = await axios.post(reg.forward_url, body, {
         timeout: config.fanout.timeoutMs,
+        // Never follow redirects: a 3xx could bounce us off the validated host
+        // onto an internal address, re-opening the SSRF hole.
+        maxRedirects: 0,
         headers: {
           'Content-Type': 'application/json',
           'x-shopflow-signature-256': signature,

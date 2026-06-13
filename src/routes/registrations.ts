@@ -1,19 +1,11 @@
 import { Router, type Response } from 'express';
 import { tenantAuth, type TenantRequest } from '../middleware/tenantAuth.js';
 import { Registration } from '../models/index.js';
+import { assertSafeForwardUrl, SsrfError } from '../utils/ssrfGuard.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
 router.use(tenantAuth);
-
-function validUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
 
 /**
  * PUT /api/v1/registrations — upsert the WABA → forward_url mapping for this tenant.
@@ -30,9 +22,16 @@ router.put('/', async (req: TenantRequest, res: Response) => {
       res.status(400).json({ status: 'error', message: 'waba_id is required' });
       return;
     }
-    if (!validUrl(forwardUrl)) {
-      res.status(400).json({ status: 'error', message: 'forward_url must be http(s)' });
-      return;
+    try {
+      // SSRF guard: reject non-http(s) and any URL that resolves to a
+      // private/loopback/link-local/metadata address.
+      await assertSafeForwardUrl(forwardUrl);
+    } catch (err) {
+      if (err instanceof SsrfError) {
+        res.status(400).json({ status: 'error', message: err.message });
+        return;
+      }
+      throw err;
     }
     if (!forwardSecret || forwardSecret.length < 32) {
       res.status(400).json({
