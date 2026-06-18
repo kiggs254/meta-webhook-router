@@ -4,10 +4,19 @@ import { sequelize } from './models/index.js';
 import { handleMetaVerification, handleMetaEvent, handleWebhookHitsList } from './routes/meta.js';
 import registrationsRouter from './routes/registrations.js';
 import embeddedSignupRouter from './routes/embeddedSignup.js';
+import { securityHeaders } from './middleware/securityHeaders.js';
 import logger from './utils/logger.js';
 
 export async function createApp(): Promise<Express> {
   const app = express();
+
+  // Don't advertise the framework.
+  app.disable('x-powered-by');
+
+  // Baseline security headers on every response (runs before all routes,
+  // including the webhook handlers and the 404 fallback). The embedded-signup
+  // route overrides CSP/X-Frame-Options afterwards for its HTML page.
+  app.use(securityHeaders);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', env: config.server.env });
